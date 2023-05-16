@@ -8,8 +8,15 @@
       const lightbox = new PhotoSwipeLightbox({
         gallery: '#my-gallery',
         children: 'a',
+        showHideAnimationType: 'none',
+        zoomAnimationDuration: false,
+        showAnimationDuration: 0,
+        hideAnimationDuration: 0,
         pswpModule: PhotoSwipe
       });
+      lightbox.addFilter(
+        'useContentPlaceholder',
+        (useContentPlaceholder, content) => { return false; });
       lightbox.init();
     </script>
     <style>
@@ -26,6 +33,7 @@
     <div class="pswp-gallery pswp-gallery--single-column" id="my-gallery">
       {{ range .Pix }}
       <a href="{{ .Filename }}"
+         data-cropped="true"
          data-pswp-width="{{ .Width }}"
          data-pswp-height="{{ .Height }}"
          data-pswp-srcset="{{ .Small }} {{ .SmallWidth }}w, {{ .Filename }} {{ .Width }}w"
