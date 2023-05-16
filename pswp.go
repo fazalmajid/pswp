@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"errors"
 	"flag"
 	"html/template"
 	"image"
@@ -15,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/artyom/smartcrop"
@@ -29,6 +29,7 @@ type Pix struct {
 	Filename, Small, Thumbnail                                      string
 	Width, Height, SmallWidth, SmallHeight, ThumbWidth, ThumbHeight int
 	Copyright                                                       string
+	Position                                                        int
 }
 
 type TemplateData struct {
@@ -45,7 +46,8 @@ var (
 	thm_w   uint
 	thm_h   uint
 	target  string
-	out_q   chan Pix
+	pix_q   chan Pix
+	wg      sync.WaitGroup
 )
 
 // From https://github.com/dimsemenov/PhotoSwipe
@@ -100,7 +102,9 @@ func CopyFS(in fs.FS, target string) error {
 		})
 }
 
-func thumbnail(path string, fn_stat os.FileInfo) error {
+func thumbnail(path string, fn_stat os.FileInfo, position int) {
+	defer wg.Done()
+
 	fn := filepath.Join(target, filepath.Base(path))
 	if verbose > 1 {
 		log.Println("fn", fn)
@@ -110,14 +114,14 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		if verbose > 1 {
 			log.Println("_thm or _small", path)
 		}
-		return nil
+		return
 	}
 	ext_offset := strings.LastIndex(fn, ".")
 	if ext_offset == -1 {
 		if verbose > 1 {
 			log.Println("no extension", path)
 		}
-		return nil
+		return
 	}
 	ext := fn[ext_offset:]
 	switch strings.ToLower(ext) {
@@ -127,7 +131,7 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		if verbose > 1 {
 			log.Println("wrong extension", path)
 		}
-		return nil
+		return
 	}
 	_, err := os.Stat(fn)
 	if err == nil {
@@ -137,17 +141,20 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 	if err != nil {
 		err = shutil.CopyFile(path, fn, false)
 		if err != nil {
-			return err
+			log.Fatal("error copying source image file:", err)
+			return
 		}
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		log.Fatal("error opening source image file:", path, err)
+		return
 	}
 	defer f.Close()
 	img, format, err := image.Decode(f)
 	if err != nil {
-		return err
+		log.Fatal("error decoding source image file:", path, err)
+		return
 	}
 	f.Seek(0, 0)
 	bounds := img.Bounds().Size()
@@ -165,7 +172,7 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 	small_stat, err := os.Stat(small_fn)
 	small_img := resize.Thumbnail(small_w, small_h, img, resize.Lanczos2)
 	sbounds := small_img.Bounds().Size()
-	pix = append(pix, Pix{
+	pix_q <- Pix{
 		filepath.Base(fn),
 		filepath.Base(small_fn),
 		filepath.Base(thm_fn),
@@ -173,7 +180,8 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		sbounds.X, sbounds.Y,
 		int(thm_w), int(thm_h),
 		copyright,
-	})
+		position,
+	}
 	if err != nil || small_stat.ModTime().Before(fn_stat.ModTime()) {
 		// regenerate the small if it is more older than the image
 		if verbose > 0 {
@@ -182,7 +190,8 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		small_f, err := os.Create(small_fn)
 		defer small_f.Close()
 		if err != nil {
-			return err
+			log.Fatal("error creating small image file"+small_fn+": ", err)
+			return
 		}
 		switch format {
 		case "jpeg":
@@ -190,7 +199,7 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		case "png":
 			png.Encode(small_f, small_img)
 		default:
-			return errors.New("unexpected format: " + format)
+			log.Fatal("unexpected format for " + small_fn + ": " + format)
 		}
 	}
 	thm_stat, err := os.Stat(thm_fn)
@@ -199,16 +208,17 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		if verbose > 1 {
 			log.Println("thumbnail more recent than original", path)
 		}
-		return nil
+		return
 	}
 	// if verbose > 0 {
 	// 	log.Println("generating thumbnail", thm_fn, "for", fn, "format", format, "metadata", meta)
 	// }
 	crop, err := smartcrop.Crop(img, int(thm_w), int(thm_h))
 	if err != nil {
-		return err
+		log.Fatal("could not smart crop "+fn+": ", err)
+		return
 	}
-	if verbose > 0 {
+	if verbose > 1 {
 		log.Println("\tthe best crop is", crop)
 	}
 	thm_sub, ok := img.(interface {
@@ -218,13 +228,14 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 		if verbose > 0 {
 			log.Println("cannot crop", fn)
 		}
-		return nil
+		return
 	}
 	thm_img := resize.Resize(thm_w, thm_h, thm_sub.SubImage(crop), resize.Lanczos2)
 	thm_f, err := os.Create(thm_fn)
 	defer thm_f.Close()
 	if err != nil {
-		return err
+		log.Fatal("could not thumbnail "+thm_fn+": ", err)
+		return
 	}
 	switch format {
 	case "jpeg":
@@ -232,9 +243,9 @@ func thumbnail(path string, fn_stat os.FileInfo) error {
 	case "png":
 		png.Encode(thm_f, thm_img)
 	default:
-		return errors.New("unexpected format: " + format)
+		log.Fatal("unexpected format for " + thm_fn + ": " + format)
+		return
 	}
-	return nil
 }
 
 func main() {
@@ -297,19 +308,26 @@ func main() {
 	}
 	defer index.Close()
 
-	pix = make([]Pix, 0, 100)
-
 	// walk the current directory looking for image files
-	for _, fn := range flag.Args() {
+	images := flag.Args()
+	pix_q = make(chan Pix, len(images))
+	for position, fn := range images {
 		i, err := os.Stat(fn)
 		if err != nil {
 			log.Fatal("could not stat", fn, ": ", err)
 		}
-		err = thumbnail(fn, i)
-		if err != nil {
-			log.Fatal("could not thumbnail", fn, ": ", err)
-		}
+		// preserve the order in which the args were given
+		wg.Add(1)
+		go thumbnail(fn, i, position)
 	}
+	wg.Wait()
+	close(pix_q)
+
+	pix = make([]Pix, len(images))
+	for p := range pix_q {
+		pix[p.Position] = p
+	}
+
 	if err != nil {
 		log.Fatal("walk error:", err)
 	}
