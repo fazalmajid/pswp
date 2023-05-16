@@ -45,6 +45,7 @@ var (
 	thm_w   uint
 	thm_h   uint
 	target  string
+	out_q   chan Pix
 )
 
 // From https://github.com/dimsemenov/PhotoSwipe
@@ -77,22 +78,22 @@ func CopyFS(in fs.FS, target string) error {
 			} else {
 				if verbose > 1 {
 					log.Println("copying", fn, "to destination")
-					data, err := fs.ReadFile(in, fn)
-					if err != nil {
-						return err
-					}
-					info, err := i.Info()
-					if err != nil {
-						return err
-					}
-					err = os.WriteFile(
-						filepath.Join(target, fn),
-						data,
-						info.Mode().Perm(),
-					)
-					if err != nil {
-						return err
-					}
+				}
+				data, err := fs.ReadFile(in, fn)
+				if err != nil {
+					return err
+				}
+				info, err := i.Info()
+				if err != nil {
+					return err
+				}
+				err = os.WriteFile(
+					filepath.Join(target, fn),
+					data,
+					info.Mode().Perm(),
+				)
+				if err != nil {
+					return err
 				}
 			}
 			return nil
@@ -278,7 +279,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 	// copy PhotoSwipe assets
-	if verbose > 0 {
+	if verbose > 1 {
 		log.Println("copying PhotoSwipe assets")
 	}
 	dist, err := fs.Sub(assets, "PhotoSwipe/dist")
@@ -299,12 +300,16 @@ func main() {
 	pix = make([]Pix, 0, 100)
 
 	// walk the current directory looking for image files
-	err = filepath.Walk(".", func(fn string, i os.FileInfo, err error) error {
+	for _, fn := range flag.Args() {
+		i, err := os.Stat(fn)
 		if err != nil {
-			return err
+			log.Fatal("could not stat", fn, ": ", err)
 		}
-		return thumbnail(fn, i)
-	})
+		err = thumbnail(fn, i)
+		if err != nil {
+			log.Fatal("could not thumbnail", fn, ": ", err)
+		}
+	}
 	if err != nil {
 		log.Fatal("walk error:", err)
 	}

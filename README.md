@@ -15,3 +15,7 @@ You need [Go](https://golang.org) as a prerequisite.
 Git clone or extract the source code from a tarball, then run `make`
 
 ## Usage
+
+```
+pswp -t "<Your title here>" -o "<output directory>" *.jpg
+```
