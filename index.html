@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script type="module">
+      import PhotoSwipeLightbox from './photoswipe-lightbox.esm.js';
+      import PhotoSwipe from './photoswipe.esm.js';
+      const lightbox = new PhotoSwipeLightbox({
+        gallery: '#my-gallery',
+        children: 'a',
+        pswpModule: PhotoSwipe
+      });
+      lightbox.init();
+    </script>
+    <style>
+      body {
+        color: white;
+        font-family: Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif;
+        background-color: black;
+      }
+    </style>
+    <link rel="stylesheet" href="photoswipe.css">
+  </head>
+  <body>
+    <h1>{{ .Title }}</h1>
+    <div class="pswp-gallery pswp-gallery--single-column" id="my-gallery">
+      {{ range .Pix }}
+      <a href="{{ .Filename }}"
+         data-pswp-width="{{ .Width }}"
+         data-pswp-height="{{ .Height }}"
+         data-pswp-srcset="{{ .Small }} {{ .SmallWidth }}w, {{ .Filename }} {{ .Width }}w"
+         target="_blank">
+        <img src="{{ .Thumbnail }}"
+             largeDim=""
+             smallUrl="{{ .Small }}"
+             smallDim="{{ .SmallWidth }}x{{ .SmallHeight }}"
+             width="{{ .ThumbWidth }}" height="{{ .ThumbHeight }}"
+             title=""
+             caption=""
+             alt=""
+             copyright="{{ .Copyright }}">
+      </a>
+    {{ end }}
+  </body>
+</html>
