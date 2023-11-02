@@ -11,5 +11,5 @@ require (
 
 require (
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b // indirect
-	golang.org/x/image v0.7.0 // indirect
+	golang.org/x/image v0.10.0 // indirect
 )
