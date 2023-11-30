@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime/pprof"
@@ -36,6 +37,7 @@ type TemplateData struct {
 	Title     string
 	Generated string
 	Pix       []Pix
+	Target    string
 }
 
 var (
@@ -343,9 +345,29 @@ func main() {
 		Title:     *title,
 		Generated: time.Now().Format("date = \"2006-01-02\""),
 		Pix:       pix,
+		Target:    target,
 	})
 	if err != nil {
 		log.Fatal("could not execute index template: ", err)
+	}
+
+	if verbose > 0 {
+		log.Println("zipping", len(images), "images")
+	}
+	args := []string{"-0r", target + ".zip"}
+	for _, fn := range images {
+		args = append(args, path.Join(target, path.Base(fn)))
+	}
+	cmd := exec.Command("zip", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		log.Fatal("could not zip images: ", err)
+	}
+	err = os.Rename(target+".zip", path.Join(target, target+".zip"))
+	if err != nil {
+		log.Fatal("could not move zipfile: ", err)
 	}
 
 	return
