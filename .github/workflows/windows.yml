@@ -25,7 +25,11 @@ jobs:
       run: env GOOS=windows GOARCH=amd64 make clean all
 
     - name: Upload Windows pswp.exe
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: pswp.exe
-        path: pswp.exe
+        upload_url: ${{ github.event.release.upload_url }} 
+          asset_path: pswp.exe
+          asset_name: pswp.exe
+          asset_content_type: application/octet-stream
