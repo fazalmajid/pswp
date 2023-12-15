@@ -4,14 +4,11 @@
 name: Windows
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  release:
+    types: [created]  
 
 jobs:
-
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
