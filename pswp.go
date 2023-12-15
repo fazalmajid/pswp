@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bufio"
 	"embed"
 	"flag"
 	"html/template"
@@ -10,9 +12,9 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -311,7 +313,22 @@ func main() {
 	defer index.Close()
 
 	// walk the current directory looking for image files
-	images := flag.Args()
+	images := []string{}
+	if runtime.GOOS == "windows" {
+		// the Windows shell does not expand globs
+		for _, pattern := range flag.Args() {
+			matches, err := filepath.Glob(pattern)
+			if err == filepath.ErrBadPattern {
+				log.Fatal("invalid glob pattern: ", pattern)
+			}
+			if matches != nil {
+				images = append(images, matches...)
+			}
+		}
+	} else {
+		images = flag.Args()
+	}
+
 	pix_q = make(chan Pix, len(images))
 	for position, fn := range images {
 		i, err := os.Stat(fn)
@@ -354,16 +371,36 @@ func main() {
 	if verbose > 0 {
 		log.Println("zipping", len(images), "images")
 	}
-	args := []string{"-0r", target + ".zip"}
-	for _, fn := range images {
-		args = append(args, path.Join(target, path.Base(fn)))
-	}
-	cmd := exec.Command("zip", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
+	zipfile, err := os.OpenFile(
+		target+".zip", os.O_CREATE|os.O_RDWR, 0755,
+	)
 	if err != nil {
-		log.Fatal("could not zip images: ", err)
+		log.Fatal("could not open zipfile for write: ", err)
+	}
+	buf := bufio.NewWriter(zipfile)
+	w := zip.NewWriter(buf)
+	for _, fn := range images {
+		fqfn := path.Join(target, path.Base(fn))
+		f, err := w.Create(fqfn)
+		if err != nil {
+			log.Fatal("could not add ", fqfn, " to zipfile: ", err)
+		}
+		buf, err := os.ReadFile(fqfn)
+		if err != nil {
+			log.Fatal("could not read ", fqfn, ": ", err)
+		}
+		_, err = f.Write(buf)
+		if err != nil {
+			log.Fatal("could not write ", fqfn, " to zipfile: ", err)
+		}
+	}
+	err = w.Close()
+	if err != nil {
+		log.Fatal("could not close zipfile: ", err)
+	}
+	err = zipfile.Close()
+	if err != nil {
+		log.Fatal("could not close zipfile: ", err)
 	}
 	err = os.Rename(target+".zip", path.Join(target, target+".zip"))
 	if err != nil {

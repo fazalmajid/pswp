@@ -11,7 +11,7 @@ PhotoSwipe:
 	git clone https://github.com/dimsemenov/PhotoSwipe
 
 clean:
-	-rm -rf src pkg pswp *~ core
+	-rm -rf src pkg pswp pswp.exe *~ core
 
 realclean: clean
 	-rm -rf PhotoSwipe

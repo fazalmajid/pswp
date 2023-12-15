@@ -19,3 +19,11 @@ Git clone or extract the source code from a tarball, then run `make`
 ```
 pswp -t "<Your title here>" -o "<output directory>" *.jpg
 ```
+
+The generated gallery has JavaScript and cannot be opened directly, you will need to run it behind a proper web server. If you do not have one and do have Python installed, an easy way to preview is to run:
+
+```
+python3 -m http.server
+```
+
+then open http://localhost:8000/
