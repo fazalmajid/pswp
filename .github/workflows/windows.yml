@@ -27,6 +27,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }} 
-        asset_path: pswp.exe
+        asset_path: ./pswp.exe
         asset_name: pswp.exe
         asset_content_type: application/octet-stream
