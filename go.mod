@@ -1,6 +1,6 @@
 module github.com/fazalmajid/pswp
 
-go 1.20
+go 1.25.0
 
 require (
 	github.com/artyom/smartcrop v0.0.0-20151228104656-7a9cbb970c13
@@ -11,5 +11,5 @@ require (
 
 require (
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b // indirect
-	golang.org/x/image v0.24.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 )
